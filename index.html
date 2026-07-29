@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
+    <title>송파구 20개 노선 경로 중첩 및 범례 분석</title>
+    <script type="text/javascript" src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=y67tjpyj78"></script>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            font-family: sans-serif;
+        }
+        #map {
+            width: calc(100% - 320px);
+            height: 100%;
+            position: absolute;
+            right: 0;
+            top: 0;
+        }
+        #sidebar {
+            width: 320px;
+            height: 100%;
+            padding: 15px;
+            background: #f9f9f9;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+            z-index: 10;
+            box-sizing: border-box;
+            overflow-y: auto;
+        }
+        #sidebar h3 {
+            margin-top: 0;
+            font-size: 16px;
+        }
+        .route-item {
+            margin-bottom: 8px;
+            font-size: 13px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+        }
+        .route-item input {
+            margin-right: 6px;
+        }
+        /* 우측 하단 범례 박스 디자인 */
+        #legend {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            z-index: 100;
+            font-size: 13px;
+        }
+        #legend h4 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+        .legend-color {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            margin-right: 8px;
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 왼쪽 제어 패널 (20개 노선 체크박스 및 색상 표기) -->
+    <div id="sidebar">
+        <h3>송파구 20개 노선 토글</h3>
+        <div class="route-item"><label><input type="checkbox" id="chk1" checked onchange="updateMap()"> [퇴근(교)] 15:20/23:20 강동하남 (빨간색)</label></div>
+        <div class="route-item"><label><input type="checkbox" id="chk2" checked onchange="updateMap()"> [퇴근(평/해프전)] 13:30/16:00 잠실/천호 (파랑)</label></div>
+        <div class="route-item"><label><input type="checkbox" id="chk3" checked onchange="updateMap()"> [퇴근(금/평)] 16:00/17:00 문정/가락/잠실(초록)</label></div>
+        <div class="route-item"><label><input type="checkbox" id="chk4" checked onchange="updateMap()"> [퇴근(금/평)] 16:00/17:00 천호/답십리 (주황색)</label></div>
+        <div class="route-item"><label><input type="checkbox" id="chk5" checked onchange="updateMap()"> [퇴근(평)] 17:00 고덕동 (보라색)</label></div>
+        <div class="route-item"><label><input type="checkbox" id="chk6" checked onchange="updateMap()"> [퇴근(평/토)] 17:00/13:00 올림픽/잠실 (청록색)</label></div>
+        <div class="route-item"><label><input type="checkbox" id="chk7" checked onchange="updateMap()"> [퇴근(평/토)] 17:00/13:00 천호역 (갈색)</label></div>
+        <div class="route-item"><label><input type="checkbox" id="chk8" checked onchange="updateMap()"> [퇴근(교)] 15:20/23:20 잠실 (핑크색)</label></div>
+        <div class="route-item"><label><input type="checkbox" id="chk9" checked onchange="updateMap()"> [퇴근(평)] dummy (회색)</label></div>
+        <div class="route-item"><label><input type="checkbox" id="chk10" checked onchange="updateMap()"> [출근(교)] 05:08/13:04 강동하남선 (검정색)</label></div>
+        <div class="route-item"><label><input type="checkbox" id="chk11" checked onchange="updateMap()"> [출근(교)] 05:40/13:25 잠실선 (다홍색)</label></div>
+        <div class="route-item"><label><input type="checkbox" id="chk12" checked onchange="updateMap()"> [출근(토)] 06:50 가락동선 (남색)</label></div>
+        <div class="route-item"><label><input type="checkbox" id="chk13" checked onchange="updateMap()"> [출근(토)] 06:59 구의/천호 (연두색)</label></div>
+        <div class="route-item"><label><input type="checkbox" id="chk14" checked onchange="updateMap()"> [출근(토)] 06:55 잠실/천호 (진주황)</label></div>
+        <div class="route-item"><label><input type="checkbox" id="chk15" checked onchange="updateMap()"> [출근(평)] 07:45/08:50/11:20 잠실/천호 (자주)</label></div>
+        <div class="route-item"><label><input type="checkbox" id="chk16" checked onchange="updateMap()"> [출근(평)] 05:50 잠실/방이 (하늘색)</label></div>
+        <div class="route-item"><label><input type="checkbox" id="chk17" checked onchange="updateMap()"> [출근(평)] 05:51/07:41 잠실/장지 (황토색)</label></div>
+        <div class="route-item"><label><input type="checkbox" id="chk18" checked onchange="updateMap()"> [출근(평)] 05:54 강동구/상일 (진분홍)</label></div>
+        <div class="route-item"><label><input type="checkbox" id="chk19" checked onchange="updateMap()"> [출근(평)] 06:00 길동/상일 (진회색)</label></div>
+        <div class="route-item"><label><input type="checkbox" id="chk20" checked onchange="updateMap()"> [출근(평)] dummy (진청록)</label></div>
+    </div>
+
+    <!-- 지도가 그려질 영역 -->
+    <div id="map"></div>
+
+    <!-- 우측 하단 범례 UI -->
+    <div id="legend">
+        <h4>중첩 횟수별 범례</h4>
+        <div class="legend-item"><div class="legend-color" style="background: #ffcccc;"></div> 1개 중첩 (연한 분홍)</div>
+        <div class="legend-item"><div class="legend-color" style="background: #ff7777;"></div> 2개 중첩 (조금 붉은색)</div>
+        <div class="legend-item"><div class="legend-color" style="background: #ff2200;"></div> 3개 중첩 (더 붉은색)</div>
+        <div class="legend-item"><div class="legend-color" style="background: #cc0000;"></div> 4개 중첩 (아주 빨간색)</div>
+        <div class="legend-item"><div class="legend-color" style="background: #9900ff;"></div> 5개 이상 (보라색 형광)</div>
+    </div>
+
+    <script>
+        // 1. 송파구 중심(석촌호수/잠실역 부근)으로 지도 초기화
+        var map = new naver.maps.Map('map', {
+            center: new naver.maps.LatLng(37.5133, 127.1001),
+            zoom: 13
+        });
+
+        // 2. 송파구 일대(잠실, 올림픽공원, 가락시장, 방이동 등)를 가로지르는 20개 노선 (각 최소 3개 이상의 변곡점 좌표 포함)
+        var coordsList = [
+            /* 1 빨간색 */ [new naver.maps.LatLng(37.559475, 127.195110), new naver.maps.LatLng(37.559371, 127.183549), new naver.maps.LatLng(37.556581, 127.164010),new naver.maps.LatLng(37.554829, 127.146540),new naver.maps.LatLng(37.530642, 127.137179)],
+            /* 2 파란색 */ [new naver.maps.LatLng(37.546593, 127.172080), new naver.maps.LatLng(37.534396, 127.137067), new naver.maps.LatLng(37.537721, 127.126711), new naver.maps.LatLng(37.513098, 127.098727)], // 37.513, 127.100 중첩
+            /* 3 초록색 */ [new naver.maps.LatLng(37.494660, 127.116846), new naver.maps.LatLng(37.500264, 127.111704), new naver.maps.LatLng(37.503347, 127.108922), new naver.maps.LatLng(37.513098, 127.098727)], // 37.513, 127.100 중첩
+            /* 4 주황색 */ [new naver.maps.LatLng(37.546593, 127.172080), new naver.maps.LatLng(37.534396, 127.137067), new naver.maps.LatLng(37.537721, 127.126711), new naver.maps.LatLng(37.545347, 127.103571)],
+            /* 5 보라색 */ [new naver.maps.LatLng(37.556581, 127.164010), new naver.maps.LatLng(37.555348, 127.155882), new naver.maps.LatLng(37.554829, 127.146540), new naver.maps.LatLng(37.554817, 127.131338), new naver.maps.LatLng(37.550929, 127.127762)], // 37.513, 127.100 중첩
+            /* 6 청록색 */ [new naver.maps.LatLng(37.519021, 127.139974), new naver.maps.LatLng(37.516440, 127.130844), new naver.maps.LatLng(37.514247, 127.102726), new naver.maps.LatLng(37.511990, 127.091110), new naver.maps.LatLng(37.511879, 127.084841)],
+            /* 7 갈색   */ [new naver.maps.LatLng(37.546593, 127.172080), new naver.maps.LatLng(37.534396, 127.137067), new naver.maps.LatLng(37.537721, 127.126711)],
+            /* 8 핑크색 */ [new naver.maps.LatLng(37.514247, 127.102726), new naver.maps.LatLng(37.513098, 127.098727)],
+            /* 9 회색   */ [new naver.maps.LatLng(137.556581, 127.164010) ],
+            /* 10 검정색*/ [new naver.maps.LatLng(37.529844, 127.137021), new naver.maps.LatLng(37.554636, 127.146326), new naver.maps.LatLng(37.556450, 127.164675)],
+            /* 11 다홍색*/ [new naver.maps.LatLng(37.511845, 127.094318), new naver.maps.LatLng(37.509964, 127.099178)], // 37.513, 127.100 중첩 (5개 이상 달성 지점)
+            /* 12 남색  */ [new naver.maps.LatLng(37.492788, 127.119691), new naver.maps.LatLng(37.501074, 127.127360), new naver.maps.LatLng(37.524571, 127.135254), new naver.maps.LatLng(37.533650, 127.141079), new naver.maps.LatLng(37.546347, 127.172536)],
+            /* 13 연두색*/ [new naver.maps.LatLng(37.538184, 127.124704), new naver.maps.LatLng(37.533650, 127.141079), new naver.maps.LatLng(37.546347, 127.172536)],
+            /* 14 진주황*/ [new naver.maps.LatLng(37.511845, 127.094318), new naver.maps.LatLng(37.538184, 127.124704), new naver.maps.LatLng(37.533650, 127.141079), new naver.maps.LatLng(37.546347, 127.172536)],
+            /* 15 자주색*/ [new naver.maps.LatLng(37.511845, 127.094318), new naver.maps.LatLng(37.538184, 127.124704), new naver.maps.LatLng(37.533650, 127.141079), new naver.maps.LatLng(37.546347, 127.172536)],
+            /* 16 하늘색*/ [new naver.maps.LatLng(37.518917, 127.105830), new naver.maps.LatLng(37.504798, 127.107233), new naver.maps.LatLng(37.499806, 127.111870), new naver.maps.LatLng(37.501242, 127.129245), new naver.maps.LatLng(37.499512, 127.135514)],
+            /* 17 황토색*/ [new naver.maps.LatLng(37.511473, 127.084458), new naver.maps.LatLng(37.511845, 127.094318), new naver.maps.LatLng(37.504798, 127.107233), new naver.maps.LatLng(37.492202, 127.118812), new naver.maps.LatLng(37.480128, 127.125270)],
+            /* 18 진분홍*/ [new naver.maps.LatLng(37.531803, 127.121059), new naver.maps.LatLng(37.540035, 127.123935), new naver.maps.LatLng(37.550972, 127.127891), new naver.maps.LatLng(37.554636, 127.145690), new naver.maps.LatLng(37.555087, 127.155005), new naver.maps.LatLng(37.556430, 127.164720), new naver.maps.LatLng(37.546347, 127.172536)],
+            /* 19 진회색*/ [new naver.maps.LatLng(37.534509, 127.136219), new naver.maps.LatLng(37.546347, 127.172536)],
+            /* 20 진청록*/ [new naver.maps.LatLng(137.510, 127.125)]
+        ];
+
+        // 20개 노선 각각의 고유 색상 배열
+        var routeColors = [
+            '#ff0000', '#0000ff', '#008000', '#ffa500', '#800080', 
+            '#008080', '#a52a2a', '#ffc0cb', '#808080', '#000000', 
+            '#ff4500', '#000080', '#9acd32', '#ff8c00', '#8b008b', 
+            '#00bfff', '#d2b48c', '#ff1493', '#2f4f4f', '#008b8b'
+        ];
+        
+        var activePolylines = [];
+        var activeCircles = [];
+
+        // 최초 실행 시 맵 렌더링
+        updateMap();
+
+        // 3. 체크박스 상태 변경 및 렌더링 함수
+        function updateMap() {
+            for (var i = 0; i < activePolylines.length; i++) activePolylines[i].setMap(null);
+            for (var j = 0; j < activeCircles.length; j++) activeCircles[j].setMap(null);
+            activePolylines = [];
+            activeCircles = [];
+
+            var pointCounts = {};
+
+            for (var r = 0; r < coordsList.length; r++) {
+                var chk = document.getElementById('chk' + (r + 1));
+                if (chk && chk.checked) {
+                    // 선(Polyline) 그리기
+                    var pl = new naver.maps.Polyline({
+                        map: map,
+                        path: coordsList[r],
+                        strokeColor: routeColors[r],
+                        strokeWeight: 4
+                    });
+                    activePolylines.push(pl);
+
+                    // 변곡점 좌표 빈도수 집계
+                    for (var p = 0; p < coordsList[r].length; p++) {
+                        var latKey = coordsList[r][p].lat().toFixed(5);
+                        var lngKey = coordsList[r][p].lng().toFixed(5);
+                        var key = latKey + "," + lngKey;
+
+                        if (!pointCounts[key]) {
+                            pointCounts[key] = {
+                                latLng: coordsList[r][p],
+                                count: 0
+                            };
+                        }
+                        pointCounts[key].count++;
+                    }
+                }
+            }
+
+            // 중첩 횟수에 따른 단계별 원(Circle) 생성
+            for (var key in pointCounts) {
+                var item = pointCounts[key];
+                var count = item.count;
+                var fillColor, radius, strokeColor;
+
+                if (count === 1) {
+                    fillColor = '#ffcccc'; strokeColor = '#ff9999'; radius = 55;
+                } else if (count === 2) {
+                    fillColor = '#ff7777'; strokeColor = '#ff4444'; radius = 70;
+                } else if (count === 3) {
+                    fillColor = '#ff2200'; strokeColor = '#cc1100'; radius = 85;
+                } else if (count === 4) {
+                    fillColor = '#cc0000'; strokeColor = '#990000'; radius = 100;
+                } else {
+                    fillColor = '#9900ff'; strokeColor = '#6600cc'; radius = 115; // 5개 이상 중첩 시 보라색 형광
+                }
+
+                var circle = new naver.maps.Circle({
+                    map: map,
+                    center: item.latLng,
+                    radius: radius,
+                    fillColor: fillColor,
+                    fillOpacity: 0.5,
+                    strokeColor: strokeColor,
+                    strokeWeight: 2,
+                    strokeOpacity: 0.8
+                });
+
+                activeCircles.push(circle);
+            }
+        }
+    </script>
+</body>
+</html>
