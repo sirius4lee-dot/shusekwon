@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
+    <title>송파구/강동구 셔세권 및 학교 정보</title>
+    <!-- [보안 1] API 인증 Key를 HTML 소스 대신 런타임에 동적으로 주입하여 GitHub 소스 노출 방지 -->
+    <script type="text/javascript" id="naver-map-script"></script>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            font-family: sans-serif;
+            overflow: hidden;
+        }
+        #map {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            left: 0;
+            top: 0;
+        }
+        /* [보안 3] 모바일 최적화 사이드바 (접기/펼치기 기능 적용) */
+        #sidebar {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 320px;
+            height: 100%;
+            padding: 20px 15px;
+            background: rgba(255, 255, 255, 0.95);
+            box-shadow: 2px 0 10px rgba(0,0,0,0.15);
+            z-index: 100;
+            box-sizing: border-box;
+            overflow-y: auto;
+            transition: transform 0.3s ease;
+        }
+        /* 사이드바가 닫혔을 때 왼쪽으로 숨김 */
+        #sidebar.closed {
+            transform: translateX(-100%);
+        }
+        /* 사이드바 토글 버튼 (열고 닫기) */
+        #toggle-btn {
+            position: absolute;
+            top: 15px;
+            left: 335px;
+            z-index: 101;
+            background: #ffffff;
+            border: 1px solid #ccc;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            font-weight: bold;
+            font-size: 14px;
+            transition: left 0.3s ease;
+        }
+        #sidebar.closed ~ #toggle-btn {
+            left: 15px;
+        }
+        #sidebar h3 {
+            margin-top: 0;
+            font-size: 15px;
+        }
+        .route-item {
+            margin-bottom: 8px;
+            font-size: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+        }
+        .route-item input {
+            margin-right: 6px;
+        }
+        /* 우측 하단 범례 박스 디자인 */
+        #legend {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: white;
+            padding: 12px 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            z-index: 100;
+            font-size: 12px;
+        }
+        #legend h4 {
+            margin: 0 0 8px 0;
+            font-size: 13px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            margin-right: 6px;
+            border: 1px solid #ccc;
+        }
+        /* 비밀번호 입력 오버레이 화면 스타일 */
+        #auth-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 9999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .auth-box {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            width: 300px;
+        }
+        .auth-box h3 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        .auth-box input {
+            width: 100%;
+            padding: 10px;
+            box-sizing: border-box;
+            margin-bottom: 15px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .auth-box button {
+            width: 100%;
+            padding: 10px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .auth-box button:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- [기능 1] 비밀번호 입력 잠금 화면 -->
+    <div id="auth-overlay">
+        <div class="auth-box">
+            <h3>🔒 보안 접근 확인</h3>
+            <p style="font-size: 12px; color: #666; margin-bottom: 15px;">접속 비밀번호를 입력해주세요.</p>
+            <input type="password" id="password-input" placeholder="비밀번호 입력" onkeydown="if(event.keyCode===13) checkPassword()">
+            <button onclick="checkPassword()">접속하기</button>
+        </div>
+    </div>
+
+    <!-- [보안 1 조치] 스크립트 로드 보안 처리 로직 -->
+    <script>
+        var CORRECT_PASSWORD = "1234";
+
+        function checkPassword() {
+            var inputVal = document.getElementById('password-input').value;
+            if (inputVal === CORRECT_PASSWORD) {
+                document.getElementById('auth-overlay').style.display = 'none';
+            } else {
+                alert("비밀번호가 틀렸습니다.");
+                document.getElementById('password-input').value = "";
+            }
+        }
+
+        (function() {
+            var keyId = "y67tjpyj78";
+            var script = document.getElementById('naver-map-script');
+            script.src = "https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=" + keyId;
+        })();
+    </script>
+
+
+
+    <!-- 사이드바 패널 -->
+    <div id="sidebar" class="closed">
+        <h3>송파구 맞춤 노선 토글</h3>
+        <div id="checkbox-container">
+            <!-- 학교 그룹별 평점 보기 체크박스 -->
+            <div style="margin-bottom: 15px; border-bottom: 1px solid #ddd; padding-bottom: 10px; background: #fff3f3; padding: 8px; border-radius: 4px;">
+                <div class="route-item" style="margin-bottom: 6px;">
+                    <label><input type="checkbox" id="chk-elem" onchange="toggleSchoolMarkers('elem', this.checked)"> 🎒 <strong>초등학교 Rating 보기</strong></label>
+                </div>
+                <div class="route-item" style="margin-bottom: 6px;">
+                    <label><input type="checkbox" id="chk-middle" onchange="toggleSchoolMarkers('middle', this.checked)"> 🏫 <strong>중학교 Rating 보기</strong></label>
+                </div>
+                <div class="route-item" style="margin-bottom: 0;">
+                    <label><input type="checkbox" id="chk-high" onchange="toggleSchoolMarkers('high', this.checked)"> 🎓 <strong>고등학교 Rating 보기</strong></label>
+                </div>
+            </div>
+
+            <div class="route-item"><label><input type="checkbox" id="chk1" onchange="updateMap()"> [퇴근(교)] 15:20/23:20 강동하남 (빨간색)</label></div>
+            <div class="route-item"><label><input type="checkbox" id="chk2" onchange="updateMap()"> [퇴근(평/해프전)] 13:30/16:00 잠실/천호 (파랑)</label></div>
+            <div class="route-item"><label><input type="checkbox" id="chk3" onchange="updateMap()"> [퇴근(금/평)] 16:00/17:00 문정/가락/잠실(초록)</label></div>
+            <div class="route-item"><label><input type="checkbox" id="chk4" onchange="updateMap()"> [퇴근(금/평)] 16:00/17:00 천호/답십리 (주황색)</label></div>
+            <div class="route-item"><label><input type="checkbox" id="chk5" onchange="updateMap()"> [퇴근(평)] 17:00 고덕동 (보라색)</label></div>
+            <div class="route-item"><label><input type="checkbox" id="chk6" onchange="updateMap()"> [퇴근(평/토)] 17:00/13:00 올림픽/잠실 (청록색)</label></div>
+            <div class="route-item"><label><input type="checkbox" id="chk7" onchange="updateMap()"> [퇴근(평/토)] 17:00/13:00 천호역 (갈색)</label></div>
+            <div class="route-item"><label><input type="checkbox" id="chk8" onchange="updateMap()"> [퇴근(교)] 15:20/23:20 잠실 (핑크색)</label></div>
+            <div class="route-item"><label><input type="checkbox" id="chk9" onchange="updateMap()"> [퇴근(평)] dummy (회색)</label></div>
+            <div class="route-item"><label><input type="checkbox" id="chk10" onchange="updateMap()"> [출근(교)] 05:08/13:04 강동하남선 (검정색)</label></div>
+            <div class="route-item"><label><input type="checkbox" id="chk11" onchange="updateMap()"> [출근(교)] 05:40/13:25 잠실선 (다홍색)</label></div>
+            <div class="route-item"><label><input type="checkbox" id="chk12" onchange="updateMap()"> [출근(토)] 06:50 가락동선 (남색)</label></div>
+            <div class="route-item"><label><input type="checkbox" id="chk13" onchange="updateMap()"> [출근(토)] 06:59 구의/천호 (연두색)</label></div>
+            <div class="route-item"><label><input type="checkbox" id="chk14" onchange="updateMap()"> [출근(토)] 06:55 잠실/천호 (진주황)</label></div>
+            <div class="route-item"><label><input type="checkbox" id="chk15" onchange="updateMap()"> [출근(평)] 07:45/08:50/11:20 잠실/천호 (자주)</label></div>
+            <div class="route-item"><label><input type="checkbox" id="chk16" onchange="updateMap()"> [출근(평)] 05:50 잠실/방이 (하늘색)</label></div>
+            <div class="route-item"><label><input type="checkbox" id="chk17" onchange="updateMap()"> [출근(평)] 05:51/07:41 잠실/장지 (황토색)</label></div>
+            <div class="route-item"><label><input type="checkbox" id="chk18" onchange="updateMap()"> [출근(평)] 05:54 강동구/상일 (진분홍)</label></div>
+            <div class="route-item"><label><input type="checkbox" id="chk19" onchange="updateMap()"> [출근(평)] 06:00 길동/상일 (진회색)</label></div>
+            <div class="route-item"><label><input type="checkbox" id="chk20" onchange="updateMap()"> [출근(평)] dummy (진청록)</label></div>
+        </div>
+    </div>
+
+    <!-- 사이드바 열기/닫기 버튼 -->
+    <button id="toggle-btn" onclick="toggleSidebar()">☰ 메뉴</button>
+
+    <!-- 지도가 그려질 영역 -->
+    <div id="map"></div>
+
+    <!-- 범례 UI -->
+    <div id="legend">
+        <h4>중첩 횟수별 범례</h4>
+        <div class="legend-item"><div class="legend-color" style="background: #ffcccc;"></div> 1개 중첩 (연한 분홍)</div>
+        <div class="legend-item"><div class="legend-color" style="background: #ff7777;"></div> 2개 중첩 (조금 붉은색)</div>
+        <div class="legend-item"><div class="legend-color" style="background: #ff2200;"></div> 3개 중첩 (더 붉은색)</div>
+        <div class="legend-item"><div class="legend-color" style="background: #cc0000;"></div> 4개 중첩 (아주 빨간색)</div>
+        <div class="legend-item"><div class="legend-color" style="background: #9900ff;"></div> 5개 이상 (보라색 형광)</div>
+    </div>
+
+    <script>
+        // 초등학교 데이터 리스트 (추후 자유롭게 수정/추가 가능)
+        var elemDataList = [
+            { name: "신암초등학교", lat: 37.549443, lng: 127.124415, rating: "??" },
+        //    { name: "신천초등학교", lat: 37.510000, lng: 127.090000, rank: "TOP 3", rating: "4.5" },
+         //   { name: "중대초등학교", lat: 37.495000, lng: 127.120000, rank: "TOP 5", rating: "4.3" }
+        ];
+
+        // 중학교 데이터 리스트 (추후 자유롭게 수정/추가 가능)
+        var middleDataList = [
+//          { name: "잠실중학교", lat: 37.514247, lng: 127.102726, rank: "TOP 5", rating: "4.5" },
+            { name: "보성중학교", lat: 37.520438, lng: 127.135015, rating: "3%" },
+            { name: "한영중학교", lat: 37.549118, lng: 127.157224, rating: "4%" },
+            { name: "배재중학교", lat: 37.555757, lng: 127.149611, rating: "4%" },
+            { name: "잠실중학교", lat: 37.517421, lng: 127.099435, rating: "4%" },
+            { name: "해누리중학교", lat: 37.498245, lng: 127.102214, rating: "11%" },
+            { name: "오륜중학교", lat: 37.516081, lng: 127.138818, rating: "11%" },
+            { name: "잠신중학교", lat: 37.515581, lng: 127.087891, rating: "12%" },
+            { name: "송파중학교", lat: 37.495559, lng: 127.129894, rating: "13%" },
+            { name: "명일중학교", lat: 37.557043, lng: 127.147318, rating: "14%" },
+            { name: "보인중학교", lat: 37.49821, lng: 127.137984, rating: "14%" },
+            { name: "송례중학교", lat: 37.477651, lng: 127.139829, rating: "14%" },
+            { name: "가원중학교", lat: 37.490898, lng: 127.12299, rating: "15%" },
+            { name: "고덕중학교", lat: 37.559952, lng: 127.161292, rating: "16%" },
+            { name: "신천중학교", lat: 37.515909, lng: 127.078305, rating: "18%" },
+            { name: "가락중학교", lat: 37.502173, lng: 127.118323, rating: "22%" },
+            { name: "상일중학교", lat: 37.549724, lng: 127.17034, rating: "30%" },
+            { name: "동신중학교", lat: 37.53653, lng: 127.134148, rating: "30%" },
+            { name: "석촌중학교", lat: 37.50073, lng: 127.121301, rating: "31%" },
+            { name: "강빛중학교", lat: 37.574329, lng: 127.171662, rating: "32%" },
+            { name: "문현중학교", lat: 37.480312, lng: 127.12792, rating: "32%" },
+            { name: "위례솔중학교", lat: 37.487346, lng: 127.150303, rating: "32%" },
+            { name: "풍성중학교", lat: 37.525001, lng: 127.11209, rating: "36%" },
+            { name: "강동중학교", lat: 37.569515, lng: 127.177927, rating: "37%" },
+            { name: "세륜중학교", lat: 37.508498, lng: 127.131335, rating: "37%" },
+            { name: "강일중학교", lat: 37.555238, lng: 127.138282, rating: "39%" },
+            { name: "문정중학교", lat: 37.48814, lng: 127.129865, rating: "41%" },
+            { name: "강명중학교", lat: 37.555427, lng: 127.175017, rating: "45%" },
+            { name: "성내중학교", lat: 37.528762, lng: 127.12946, rating: "46%" },
+            { name: "정신여자중학교", lat: 37.509028, lng: 127.073614, rating: "46%" },
+            { name: "아주중학교", lat: 37.505386, lng: 127.076379, rating: "47%" },
+            { name: "한산중학교", lat: 37.528505, lng: 127.140159, rating: "48%" }
+        ];
+
+        // 고등학교 데이터 리스트 (추후 자유롭게 수정/추가 가능)
+        var highDataList = [
+            { name: "명일여자고등학교", lat: 37.549988, lng: 127.150365, rating: "??" },
+    //        { name: "잠실고등학교", lat: 37.518000, lng: 127.096000, rank: "TOP 3", rating: "4.6" },
+    //        { name: "영동일고등학교", lat: 37.505000, lng: 127.085000, rank: "TOP 4", rating: "4.4" }
+        ];
+
+        // 그룹별 오버레이 관리 객체
+        var schoolOverlays = {
+            elem: [],
+            middle: [],
+            high: []
+        };
+
+        window.onload = function() {
+            var map = new naver.maps.Map('map', {
+                center: new naver.maps.LatLng(37.5133, 127.1001),
+                zoom: 14
+            });
+
+            var coordsList = [
+                [new naver.maps.LatLng(37.559475, 127.195110), new naver.maps.LatLng(37.559371, 127.183549), new naver.maps.LatLng(37.556581, 127.164010),new naver.maps.LatLng(37.554829, 127.146540),new naver.maps.LatLng(37.530642, 127.137179)],
+                [new naver.maps.LatLng(37.546593, 127.172080), new naver.maps.LatLng(37.534396, 127.137067), new naver.maps.LatLng(37.537721, 127.126711), new naver.maps.LatLng(37.513098, 127.098727)], 
+                [new naver.maps.LatLng(37.494660, 127.116846), new naver.maps.LatLng(37.500264, 127.111704), new naver.maps.LatLng(37.503347, 127.108922), new naver.maps.LatLng(37.513098, 127.098727)], 
+                [new naver.maps.LatLng(37.546593, 127.172080), new naver.maps.LatLng(37.534396, 127.137067), new naver.maps.LatLng(37.537721, 127.126711), new naver.maps.LatLng(37.545347, 127.103571)],
+                [new naver.maps.LatLng(37.556581, 127.164010), new naver.maps.LatLng(37.555348, 127.155882), new naver.maps.LatLng(37.554829, 127.146540), new naver.maps.LatLng(37.554817, 127.131338), new naver.maps.LatLng(37.550929, 127.127762)], 
+                [new naver.maps.LatLng(37.519021, 127.139974), new naver.maps.LatLng(37.516440, 127.130844), new naver.maps.LatLng(37.514247, 127.102726), new naver.maps.LatLng(37.511990, 127.091110), new naver.maps.LatLng(37.511879, 127.084841)],
+                [new naver.maps.LatLng(37.546593, 127.172080), new naver.maps.LatLng(37.534396, 127.137067), new naver.maps.LatLng(37.537721, 127.126711)],
+                [new naver.maps.LatLng(37.514247, 127.102726), new naver.maps.LatLng(37.513098, 127.098727)],
+                [new naver.maps.LatLng(37.556581, 127.164010)],
+                [new naver.maps.LatLng(37.529844, 127.137021), new naver.maps.LatLng(37.554636, 127.146326), new naver.maps.LatLng(37.556450, 127.164675)],
+                [new naver.maps.LatLng(37.511845, 127.094318), new naver.maps.LatLng(37.509964, 127.099178)], 
+                [new naver.maps.LatLng(37.492788, 127.119691), new naver.maps.LatLng(37.501074, 127.127360), new naver.maps.LatLng(37.524571, 127.135254), new naver.maps.LatLng(37.533650, 127.141079), new naver.maps.LatLng(37.546347, 127.172536)],
+                [new naver.maps.LatLng(37.538184, 127.124704), new naver.maps.LatLng(37.533650, 127.141079), new naver.maps.LatLng(37.546347, 127.172536)],
+                [new naver.maps.LatLng(37.511845, 127.094318), new naver.maps.LatLng(37.538184, 127.124704), new naver.maps.LatLng(37.533650, 127.141079), new naver.maps.LatLng(37.546347, 127.172536)],
+                [new naver.maps.LatLng(37.511845, 127.094318), new naver.maps.LatLng(37.538184, 127.124704), new naver.maps.LatLng(37.533650, 127.141079), new naver.maps.LatLng(37.546347, 127.172536)],
+                [new naver.maps.LatLng(37.518917, 127.105830), new naver.maps.LatLng(37.504798, 127.107233), new naver.maps.LatLng(37.499806, 127.111870), new naver.maps.LatLng(37.501242, 127.129245), new naver.maps.LatLng(37.499512, 127.135514)],
+                [new naver.maps.LatLng(37.511473, 127.084458), new naver.maps.LatLng(37.511845, 127.094318), new naver.maps.LatLng(37.504798, 127.107233), new naver.maps.LatLng(37.492202, 127.118812), new naver.maps.LatLng(37.480128, 127.125270)],
+                [new naver.maps.LatLng(37.531803, 127.121059), new naver.maps.LatLng(37.540035, 127.123935), new naver.maps.LatLng(37.550972, 127.127891), new naver.maps.LatLng(37.554636, 127.145690), new naver.maps.LatLng(37.555087, 127.155005), new naver.maps.LatLng(37.556430, 127.164720), new naver.maps.LatLng(37.546347, 127.172536)],
+                [new naver.maps.LatLng(37.534509, 127.136219), new naver.maps.LatLng(37.546347, 127.172536)],
+                [new naver.maps.LatLng(37.510, 127.125)]
+            ];
+
+            var routeColors = [
+                '#ff0000', '#0000ff', '#008000', '#ffa500', '#800080', 
+                '#008080', '#a52a2a', '#ffc0cb', '#808080', '#000000', 
+                '#ff4500', '#000080', '#9acd32', '#ff8c00', '#8b008b', 
+                '#00bfff', '#d2b48c', '#ff1493', '#2f4f4f', '#008b8b'
+            ];
+
+            window.activePolylines = [];
+            window.activeCircles = [];
+            window.coordsList = coordsList;
+            window.routeColors = routeColors;
+            window.mapInstance = map;
+
+            updateMap();
+        };
+
+        function getColorByRating(ratingStr) {
+            let percent = parseFloat(ratingStr.replace('%', ''));
+    
+            // 5% 이하 고정 (빨간색)
+            if (percent <= 5) return "#ff4d4d";
+            // 50% 이상 고정 (연두색)
+            if (percent >= 50) return "#7acc29";
+    
+            // 5% ~ 50% 사이를 0(빨강)부터 1(연두)까지의 비율로 계산
+            let minPercent = 5;
+            let maxPercent = 50;
+            let ratio = (percent - minPercent) / (maxPercent - minPercent);
+    
+            // 시작 색상: 빨강 (#ff4d4d -> R: 255, G: 77, B: 77)
+            let r1 = 255, g1 = 77, b1 = 77;
+            // 끝 색상: 연두 (#7acc29 -> R: 122, G: 204, B: 41)
+            let r2 = 122, g2 = 204, b2 = 41;
+    
+            // 비율에 맞춰 중간 RGB 값 계산
+            let r = Math.round(r1 + (r2 - r1) * ratio);
+            let g = Math.round(g1 + (g2 - g1) * ratio);
+            let b = Math.round(b1 + (b2 - b1) * ratio);
+    
+            // RGB를 16진수 색상 코드(#RRGGBB)로 변환
+            return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+        }
+
+        
+        function toggleSidebar() {
+            var sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('closed');
+        }
+
+        // 그룹별(초/중/고) 커스텀 오버레이 마커 토글 함수
+        function toggleSchoolMarkers(groupType, show) {
+            // 해당 그룹의 기존 오버레이 제거
+            for (var i = 0; i < schoolOverlays[groupType].length; i++) {
+                schoolOverlays[groupType][i].setMap(null);
+            }
+            schoolOverlays[groupType] = [];
+
+            if (!show) return;
+
+            
+            var dataList;
+            
+            var borderColor;
+            if (groupType === 'elem') {
+                dataList = elemDataList;
+                borderColor = '#27ae60'; // 초등학교: 초록색 테두리
+            } else if (groupType === 'middle') {
+                dataList = middleDataList;
+                borderColor = '#e74c3c'; // 중학교: 빨간색 테두리
+            } else if (groupType === 'high') {
+                dataList = highDataList;
+                borderColor = '#2980b9'; // 고등학교: 파란색 테두리
+            }
+
+            for (var j = 0; j < dataList.length; j++) {
+                var school = dataList[j];
+                var position = new naver.maps.LatLng(school.lat, school.lng);
+
+                // 마커 생성
+                var marker = new naver.maps.Marker({
+                    map: window.mapInstance,
+                    position: position,
+                    title: school.name
+                });
+                schoolOverlays[groupType].push(marker);
+
+
+                // 독립적인 랭킹 네모상자 HTML 생성
+                var contentString = [
+                    '<div style="padding:6px 10px; background:white; border:2px solid ' + borderColor + '; border-radius:6px; font-size:11px; box-shadow:0 2px 6px rgba(0,0,0,0.3); position:absolute; bottom:15px; transform:translateX(-50%); white-space:nowrap;">',
+                    '   <strong>' + school.name + '</strong><br>',
+                    '   <span style="color:' + borderColor + '; font-weight:bold;">Rating : '+'</span> '  + '상위 '+  school.rating ,
+                //  '   <span style="color:' + borderColor + '; font-weight:bold;">평점: ' + school.rating + '</span> (' + school.rank + ')',
+                    '</div>'
+                ].join('');
+
+                // CustomOverlay 객체 정의
+                var CustomOverlay = function(options) {
+                    this._position = options.position;
+                    this._content = options.content;
+                    this._map = options.map;
+                    this._element = document.createElement('div');
+                    this._element.style.position = 'absolute';
+                    this._element.innerHTML = options.content;
+                    this.setMap(options.map);
+                };
+
+                CustomOverlay.prototype = new naver.maps.OverlayView();
+                CustomOverlay.prototype.constructor = CustomOverlay;
+
+                CustomOverlay.prototype.onAdd = function() {
+                    var overlayLayer = this.getPanes().overlayLayer;
+                    overlayLayer.appendChild(this._element);
+                };
+
+                CustomOverlay.prototype.draw = function() {
+                    if (!this.getMap()) return;
+                    var projection = this.getProjection();
+                    var position = this._position;
+                    var pixelPosition = projection.fromCoordToOffset(position);
+                    this._element.style.left = pixelPosition.x + 'px';
+                    this._element.style.top = pixelPosition.y + 'px';
+                };
+
+                CustomOverlay.prototype.onRemove = function() {
+                    this._element.parentNode.removeChild(this._element);
+                    this._element.innerHTML = "";
+                };
+
+                // 각 학교마다 독립된 커스텀 오버레이 생성 및 등록
+                var customOverlay = new CustomOverlay({
+                    map: window.mapInstance,
+                    position: position,
+                    content: contentString
+                });
+
+                schoolOverlays[groupType].push(customOverlay);
+            }
+        }
+
+        function updateMap() {
+            var activePolylines = window.activePolylines;
+            var activeCircles = window.activeCircles;
+            var coordsList = window.coordsList;
+            var routeColors = window.routeColors;
+            var map = window.mapInstance;
+
+            for (var i = 0; i < activePolylines.length; i++) activePolylines[i].setMap(null);
+            for (var j = 0; j < activeCircles.length; j++) activeCircles[j].setMap(null);
+            window.activePolylines = [];
+            window.activeCircles = [];
+
+            var pointCounts = {};
+
+            for (var r = 0; r < coordsList.length; r++) {
+                var chk = document.getElementById('chk' + (r + 1));
+                if (chk && chk.checked) {
+                    var pl = new naver.maps.Polyline({
+                        map: map,
+                        path: coordsList[r],
+                        strokeColor: routeColors[r],
+                        strokeWeight: 4
+                    });
+                    window.activePolylines.push(pl);
+
+                    for (var p = 0; p < coordsList[r].length; p++) {
+                        var latKey = coordsList[r][p].lat().toFixed(5);
+                        var lngKey = coordsList[r][p].lng().toFixed(5);
+                        var key = latKey + "," + lngKey;
+
+                        if (!pointCounts[key]) {
+                            pointCounts[key] = {
+                                latLng: coordsList[r][p],
+                                count: 0
+                            };
+                        }
+                        pointCounts[key].count++;
+                    }
+                }
+            }
+
+            for (var key in pointCounts) {
+                var item = pointCounts[key];
+                var count = item.count;
+                var fillColor, radius, strokeColor;
+
+                if (count === 1) {
+                    fillColor = '#ffcccc'; strokeColor = '#ff9999'; radius = 55;
+                } else if (count === 2) {
+                    fillColor = '#ff7777'; strokeColor = '#ff4444'; radius = 70;
+                } else if (count === 3) {
+                    fillColor = '#ff2200'; strokeColor = '#cc1100'; radius = 85;
+                } else if (count === 4) {
+                    fillColor = '#cc0000'; strokeColor = '#990000'; radius = 100;
+                } else {
+                    fillColor = '#9900ff'; strokeColor = '#6600cc'; radius = 115;
+                }
+
+                var circle = new naver.maps.Circle({
+                    map: map,
+                    center: item.latLng,
+                    radius: radius,
+                    fillColor: fillColor,
+                    fillOpacity: 0.5,
+                    strokeColor: strokeColor,
+                    strokeWeight: 2,
+                    strokeOpacity: 0.8
+                });
+
+                window.activeCircles.push(circle);
+            }
+        }
+
+
+    middleDataList.forEach(function(item) {
+        let boxColor = getColorByRating(item.rating);
+    
+        let contentString = `
+          <div style="
+                background-color: ${boxColor}; 
+                padding: 5px 10px; 
+                border-radius: 4px; 
+                border: 1px solid #333; 
+                font-weight: bold; 
+                color: #fff; /* 배경색이 진하므로 글자색을 흰색으로 하면 잘 보입니다 */
+                text-align: center;
+            ">
+                ${item.name}<br>${item.rating}
+            </div>
+        `;
+
+    // 네이버 지도 커스텀 오버레이 또는 마커에 contentString 적용
+        var customOverlay = new naver.maps.CustomOverlay({
+            position: new naver.maps.LatLng(item.lat, item.lng),
+            content: contentString,
+            map: map
+        });
+    });
+    </script>
+</body>
+</html>
